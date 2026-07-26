@@ -30,6 +30,13 @@ OPENROUTER_APP_NAME = _get("OPENROUTER_APP_NAME", "EcoVision AI")
 APP_SECRET_KEY = _get("APP_SECRET_KEY", "dev-secret-change-me")
 SESSION_TIMEOUT_MINUTES = int(_get("SESSION_TIMEOUT_MINUTES", "60") or 60)
 
+# ---- Live Job Search APIs (optional — modules degrade gracefully if unset) ----
+ADZUNA_APP_ID = _get("ADZUNA_APP_ID")
+ADZUNA_APP_KEY = _get("ADZUNA_APP_KEY")
+ADZUNA_COUNTRY = _get("ADZUNA_COUNTRY", "in")  # India
+
+JOOBLE_API_KEY = _get("JOOBLE_API_KEY")
+
 # ---- Database ----
 DATABASE_PATH = str(BASE_DIR / _get("DATABASE_PATH", "database/ecovision.db"))
 
@@ -61,3 +68,12 @@ REWARD_POINTS = {
 def is_ai_configured() -> bool:
     """True once a real (non-placeholder) OpenRouter key is present."""
     return bool(OPENROUTER_API_KEY) and "your_openrouter_api_key_here" not in OPENROUTER_API_KEY
+
+
+def is_adzuna_configured() -> bool:
+    return bool(ADZUNA_APP_ID) and bool(ADZUNA_APP_KEY)
+
+
+def is_jooble_configured() -> bool:
+    return bool(JOOBLE_API_KEY)
+

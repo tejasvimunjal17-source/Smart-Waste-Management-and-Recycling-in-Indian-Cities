@@ -248,3 +248,4 @@ def search_certifications(query: str, level="Any", duration_kw="", language="Any
         "recommendation": recommendation,
         "provider_status": provider_status,
     }
+ 

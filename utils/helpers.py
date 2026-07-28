@@ -11,8 +11,30 @@ def load_css():
     if css_path.exists():
         st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
 
+    # Collapsible left drawer sidebar (reused/rebranded from LearnMate AI —
+    # see frontend/custom_sidebar.py). This only repositions/animates
+    # Streamlit's own native, auto-generated page-nav sidebar via CSS; it
+    # does not add, remove, or reorder any pages/routes.
+    from frontend.custom_sidebar import render_custom_sidebar_controls
+    render_custom_sidebar_controls()
+
 
 def init_session_state():
+    # --- DB safety net ---------------------------------------------------
+    # Streamlit multipage apps only execute app.py's top-level code when the
+    # user lands on the Home page. If someone opens /Register or any other
+    # page directly (a fresh tab, a bookmark, a shared link, Streamlit
+    # Cloud's cold start, etc.), app.py's init_db() call never runs and the
+    # "users" table won't exist yet -> sqlite3.OperationalError on
+    # registration/login. Every page calls init_session_state() (directly
+    # or via require_login()), so initializing the DB here — guarded by a
+    # session-state flag so it only runs once per session — guarantees the
+    # schema exists no matter which page is opened first.
+    if not st.session_state.get("_db_initialized"):
+        from database.db import init_db
+        init_db()
+        st.session_state["_db_initialized"] = True
+
     defaults = {
         "user": None,
         "theme": "dark",

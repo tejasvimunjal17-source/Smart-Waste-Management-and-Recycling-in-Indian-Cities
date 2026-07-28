@@ -36,21 +36,39 @@ st.info(
 tab_certs, tab_jobs, tab_resume = st.tabs(["🎓 Certification Finder", "🌱 Green Job Finder", "📄 AI Resume Generator"])
 
 
+def _safe_html(html: str) -> str:
+    """
+    Collapse a (possibly multi-line, indented) HTML snippet to a single
+    line before handing it to st.markdown().
+
+    Root cause this guards against: when a placeholder like {logo_html}
+    sits alone on its own line and evaluates to an empty string, that
+    line becomes whitespace-only. Markdown's HTML-block rule treats a
+    blank line as the end of the current raw-HTML block, so everything
+    after it gets reparsed as an *indented code block* (the source lines
+    are still indented 8-12 spaces) — which HTML-escapes every tag,
+    showing literal `</div>` etc. as visible text instead of rendering.
+    Joining everything onto one line makes a blank line structurally
+    impossible and removes all leading indentation, so this can't happen
+    regardless of which optional fields are empty. Visual output is
+    unchanged since HTML collapses whitespace between tags anyway.
+    """
+    return " ".join(line.strip() for line in html.strip().splitlines())
+
+
 def _render_result_card(title, provider_or_company, description, meta_line, url, logo="", last_updated=None, source=None):
     logo_html = f'<img src="{logo}" style="height:32px;border-radius:6px;margin-bottom:4px;" onerror="this.style.display=\'none\'">' if logo else ""
     updated_html = f'<br><span style="color:#64748b;font-size:0.78rem;">🕒 Last updated: {last_updated}</span>' if last_updated else ""
     source_html = f'<span style="color:#38bdf8;font-size:0.75rem;">· {source}</span>' if source else ""
-    st.markdown(
-        f"""<div class="eco-card">
+    html = f"""<div class="eco-card">
             {logo_html}
             <b>{title}</b> — <span style="color:#38bdf8;">{provider_or_company}</span> {source_html}<br>
             <span style="color:#94a3b8;font-size:0.85rem;">{description}</span><br>
             <span style="font-size:0.85rem;">{meta_line}</span>
             {updated_html}<br>
             <a href="{url}" target="_blank" style="color:#34d399;">Open official page →</a>
-        </div>""",
-        unsafe_allow_html=True,
-    )
+        </div>"""
+    st.markdown(_safe_html(html), unsafe_allow_html=True)
 
 
 # =====================================================================
@@ -103,7 +121,7 @@ with tab_certs:
 
             if result["recommendation"]:
                 st.markdown('<div class="eco-section-title">🤖 Recommended Similar Certifications</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="eco-card">{result["recommendation"]}</div>', unsafe_allow_html=True)
+                st.markdown(_safe_html(f'<div class="eco-card">{result["recommendation"]}</div>'), unsafe_allow_html=True)
 
             st.markdown('<div class="eco-section-title">🌐 Search Directly on Official Provider Sites</div>', unsafe_allow_html=True)
             cols = st.columns(3)
@@ -179,7 +197,7 @@ with tab_jobs:
 
             if result["recommendation"]:
                 st.markdown('<div class="eco-section-title">🎯 AI Career Tip & Learning Path</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="eco-card">{result["recommendation"]}</div>', unsafe_allow_html=True)
+                st.markdown(_safe_html(f'<div class="eco-card">{result["recommendation"]}</div>'), unsafe_allow_html=True)
 
             st.markdown('<div class="eco-section-title">🌐 Search Directly on Official Job Boards</div>', unsafe_allow_html=True)
             for link in links:

@@ -45,7 +45,10 @@ with tab_users:
 with tab_officers:
     st.subheader("Officers")
     officers = fetch_all("SELECT id, full_name, email, phone, ward, created_at FROM users WHERE role='officer'")
-    st.dataframe(pd.DataFrame(officers), use_container_width=True) if officers else st.info("No officers yet.")
+    if officers:
+        st.dataframe(pd.DataFrame(officers), use_container_width=True)
+    else:
+        st.info('No officers found. Click "Add Officer" to create the first officer.')
 
     st.markdown("**Add New Officer**")
     with st.form("add_officer"):
@@ -73,7 +76,10 @@ with tab_complaints:
         "SELECT c.id, c.category, c.status, c.priority, c.ward, u.full_name as citizen, c.created_at "
         "FROM complaints c JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 200"
     )
-    st.dataframe(pd.DataFrame(complaints), use_container_width=True) if complaints else st.info("No complaints yet.")
+    if complaints:
+        st.dataframe(pd.DataFrame(complaints), use_container_width=True)
+    else:
+        st.info("No complaints have been submitted yet.")
 
 with tab_categories:
     st.subheader("Waste Categories")
@@ -98,15 +104,23 @@ with tab_categories:
 with tab_analytics:
     cat_data = analytics.complaints_by_category()
     monthly = analytics.complaints_monthly_trend()
-    r1, r2 = st.columns(2)
-    with r1:
-        if cat_data:
-            fig = px.bar(pd.DataFrame(cat_data), x="category", y="count", title="Complaints by Category", color="category")
-            st.plotly_chart(fig, use_container_width=True)
-    with r2:
-        if monthly:
-            fig = px.line(pd.DataFrame(monthly), x="month", y="count", title="Monthly Complaint Trend", markers=True)
-            st.plotly_chart(fig, use_container_width=True)
+
+    if not cat_data and not monthly:
+        st.info("📊 No analytics available yet.\n\nAdd users and complaints to generate insights.")
+    else:
+        r1, r2 = st.columns(2)
+        with r1:
+            if cat_data:
+                fig = px.bar(pd.DataFrame(cat_data), x="category", y="count", title="Complaints by Category", color="category")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No category data available yet.")
+        with r2:
+            if monthly:
+                fig = px.line(pd.DataFrame(monthly), x="month", y="count", title="Monthly Complaint Trend", markers=True)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No monthly trend data available yet.")
 
 with tab_settings:
     st.subheader("System Settings")

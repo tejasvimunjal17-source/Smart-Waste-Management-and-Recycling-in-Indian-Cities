@@ -180,15 +180,39 @@ def render_custom_sidebar_controls() -> None:
             }}
         }}
 
-        /* ---- Desktop only: main content margin shifts in sync with the
-        drawer, since it's no longer a flex/grid sibling that reflows on
-        its own. On mobile the drawer overlays instead (no margin shift -
-        see the backdrop below). ---- */
+        /* ---- Desktop only: main content margin AND width both shift in
+        sync with the drawer. THIS IS THE FIX for the horizontal
+        layout-shift/right-edge-clipping bug: the previous version only
+        set margin-left here, with no matching width change. Since the
+        sidebar is position:fixed (out of flex flow — see module
+        docstring), stMain is the sole remaining flex child of its
+        parent and therefore already stretches to 100% of the viewport
+        width on its own; adding margin-left on top of an already
+        full-width box pushes its right edge that same distance PAST the
+        viewport's right edge, which is exactly the overflow/clipping
+        seen in the reported screenshots. Explicitly shrinking width by
+        the same amount the content is shifted keeps the right edge
+        anchored at the viewport edge instead of sliding off it, so
+        content actually resizes to fill the remaining space rather than
+        merely being shifted while staying full-width. On mobile the
+        drawer overlays instead (no margin/width shift — see the
+        backdrop below). ---- */
         @media (min-width: 641px) {{
             section[data-testid="stMain"], .main {{
                 margin-left: {main_margin} !important;
-                transition: margin-left {_TRANSITION_MS}ms ease;
+                width: calc(100% - {main_margin}) !important;
+                max-width: calc(100% - {main_margin}) !important;
+                box-sizing: border-box !important;
+                transition: margin-left {_TRANSITION_MS}ms ease, width {_TRANSITION_MS}ms ease;
             }}
+        }}
+
+        /* ---- Defensive safety net: prevent any transient horizontal
+        scrollbar/1px rounding artifact during the open/close transition
+        (belt-and-braces alongside the calc() fix above — does not
+        change any visual sizing on its own). ---- */
+        html, body, .stApp, div[data-testid="stAppViewContainer"] {{
+            overflow-x: hidden;
         }}
 
         /* ---- Mobile tap-to-close backdrop: invisible/inert on desktop,
@@ -211,6 +235,19 @@ def render_custom_sidebar_controls() -> None:
                 box-shadow: none !important;
                 cursor: pointer;
             }}
+        }}
+
+        /* ---- Hide the GitHub / Share / star / fork icon cluster in
+        Streamlit's toolbar (top-right). Multiple selectors are targeted
+        since the exact data-testid has varied across Streamlit
+        versions; this is purely cosmetic (display:none) and does not
+        remove any app functionality — the "⋮" settings/rerun menu
+        (#MainMenu) is intentionally left untouched. ---- */
+        div[data-testid="stToolbarActions"] {{
+            display: none !important;
+        }}
+        .stAppDeployButton {{
+            display: none !important;
         }}
 
         /* ---- Hide Streamlit's own native collapse control - fully

@@ -1,10 +1,25 @@
 """
 config/settings.py
 --------------------
-Loads all environment variables in one place so the rest of the app
-never touches os.environ directly. Fails loudly (with a friendly
-Streamlit error) if required secrets are missing, instead of crashing
-deep inside a request.
+Loads all configuration in one place so the rest of the app never
+touches os.environ / st.secrets directly.
+
+CREDENTIAL PRECEDENCE (this is the actual fix for "I uploaded .env but
+it's not picking up my key" on Streamlit Community Cloud):
+    1. st.secrets  (Streamlit Community Cloud "Secrets" — the real,
+       production credentials once deployed)
+    2. .env / process environment (local development only)
+    3. a documented default (for non-secret settings only — never for
+       API keys)
+
+On Streamlit Community Cloud, a local .env file is NOT read by the
+platform at all — only whatever you paste into the app's "Secrets" box
+(Settings -> Secrets) is available at runtime, via st.secrets. A repo
+containing only a placeholder .env / .env.example (as recommended —
+never commit real keys) will therefore always look "unconfigured" on
+Cloud unless the same keys are also set in Secrets. This module reads
+st.secrets first specifically so that once you add your real key there,
+it's picked up automatically with zero code changes.
 """
 import os
 from pathlib import Path
@@ -13,18 +28,97 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+# Known placeholder values from .env.example — used to distinguish "key is
+# genuinely unset/still a template" from "key is set but happens to be
+# short/odd", so the app can show an accurate, specific status message
+# instead of silently pretending a placeholder is a real credential.
+_PLACEHOLDER_MARKERS = (
+    "your_openrouter_api_key_here",
+    "your_ibm_cloud_api_key_here",
+    "your_watsonx_project_id_here",
+    "sk-or-v1-xxxxxxxxxxxxxxxx",
+    "change_this",
+    "",
+)
+
 
 def _get(name: str, default: str = "") -> str:
+    """
+    Read a config value with the precedence documented above:
+    st.secrets -> .env/environment -> default.
+    Safe to call even when no secrets.toml exists at all (st.secrets
+    raises/behaves oddly with zero configured secrets in some Streamlit
+    versions -- guarded here so that case never crashes the app).
+    """
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets"):
+            try:
+                if name in st.secrets:
+                    return str(st.secrets[name]).strip()
+            except Exception:
+                pass  # no secrets.toml locally / secrets not configured yet -- fall through to .env
+    except Exception:
+        pass  # streamlit not importable in this context (e.g. a plain script) -- fall through to .env
+
     return os.getenv(name, default).strip()
 
 
-# ---- OpenRouter ----
+def _is_placeholder(value: str) -> bool:
+    v = (value or "").strip().lower()
+    return v in _PLACEHOLDER_MARKERS or v.startswith("your_") or "xxxxxxxx" in v
+
+
+# ---------------------------------------------------------------------
+# OpenRouter
+# ---------------------------------------------------------------------
 OPENROUTER_API_KEY = _get("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = _get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-OPENROUTER_MODEL = _get("OPENROUTER_MODEL", "meta-llama/llama-3.2-11b-vision-instruct:free")
-OPENROUTER_TEXT_MODEL = _get("OPENROUTER_TEXT_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
+
+# TWO separate models, as required: one for the Prakriti AI Connect
+# chatbot (text-only is fine and cheaper/faster), one for waste-image
+# classification (MUST be vision-capable). Reading the *_CHAT_MODEL /
+# *_VISION_MODEL names first, but still honoring the older
+# OPENROUTER_TEXT_MODEL / OPENROUTER_MODEL names if that's what's in an
+# existing .env or Secrets block, so nobody's existing configuration
+# silently breaks.
+OPENROUTER_CHAT_MODEL = (
+    _get("OPENROUTER_CHAT_MODEL")
+    or _get("OPENROUTER_TEXT_MODEL")
+    or "meta-llama/llama-3.3-70b-instruct:free"
+)
+
+# Default vision model: OpenRouter's own auto-router ("openrouter/free"),
+# which selects a currently-live free model that supports image
+# understanding for each request. This is a deliberate choice over
+# pinning one specific free vision model slug: individual free vision
+# models on OpenRouter rotate/get retired over time (this is exactly
+# what happened to the previous default, meta-llama/llama-3.2-11b-
+# vision-instruct:free, which is no longer available and was the cause
+# of the reported 404 -- OpenRouter returns 404 for an unknown/retired
+# model slug). "openrouter/free" is designed specifically to stay
+# working across that churn. Set OPENROUTER_VISION_MODEL to pin a
+# specific model instead if you prefer (e.g. "qwen/qwen2.5-vl-32b-
+# instruct:free" or "google/gemma-3-27b-it:free" are known-good
+# vision-capable free options as of this writing).
+OPENROUTER_VISION_MODEL = (
+    _get("OPENROUTER_VISION_MODEL")
+    or _get("OPENROUTER_MODEL")
+    or "openrouter/free"
+)
+
 OPENROUTER_SITE_URL = _get("OPENROUTER_SITE_URL", "https://ecovision-ai.streamlit.app")
 OPENROUTER_APP_NAME = _get("OPENROUTER_APP_NAME", "EcoVision AI")
+
+# ---------------------------------------------------------------------
+# IBM watsonx.ai (credential plumbing — available for any feature that
+# wants to call watsonx.ai; OpenRouter remains the primary AI provider
+# wired through the rest of the app today)
+# ---------------------------------------------------------------------
+WATSONX_API_KEY = _get("WATSONX_API_KEY")
+WATSONX_PROJECT_ID = _get("WATSONX_PROJECT_ID")
+WATSONX_URL = _get("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
+WATSONX_MODEL_ID = _get("WATSONX_MODEL_ID", "ibm/granite-3-8b-instruct")
 
 # ---- Security ----
 APP_SECRET_KEY = _get("APP_SECRET_KEY", "dev-secret-change-me")
@@ -33,7 +127,7 @@ SESSION_TIMEOUT_MINUTES = int(_get("SESSION_TIMEOUT_MINUTES", "60") or 60)
 # ---- Live Job Search APIs (optional — modules degrade gracefully if unset) ----
 ADZUNA_APP_ID = _get("ADZUNA_APP_ID")
 ADZUNA_APP_KEY = _get("ADZUNA_APP_KEY")
-ADZUNA_COUNTRY = _get("ADZUNA_COUNTRY", "in")  # India
+ADZUNA_COUNTRY = _get("ADZUNA_COUNTRY", "in")
 
 JOOBLE_API_KEY = _get("JOOBLE_API_KEY")
 
@@ -64,10 +158,55 @@ REWARD_POINTS = {
     "referral": 25,
 }
 
+# ---- Accepted media types for waste reporting ----
+# Extensions WITHOUT the leading dot, for use with st.file_uploader(type=...).
+ACCEPTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
+ACCEPTED_VIDEO_EXTENSIONS = ["mp4", "mov", "avi", "mkv", "webm"]
+# MIME types actually used when building the OpenRouter vision request.
+IMAGE_MIME_TYPES = {
+    "jpg": "image/jpeg", "jpeg": "image/jpeg",
+    "png": "image/png", "webp": "image/webp",
+}
+
 
 def is_ai_configured() -> bool:
-    """True once a real (non-placeholder) OpenRouter key is present."""
-    return bool(OPENROUTER_API_KEY) and "your_openrouter_api_key_here" not in OPENROUTER_API_KEY
+    """True once a real (non-placeholder) OpenRouter key is present -- used for chat/text features."""
+    return bool(OPENROUTER_API_KEY) and not _is_placeholder(OPENROUTER_API_KEY)
+
+
+def is_vision_configured() -> bool:
+    """
+    True once a real OpenRouter key AND a vision model are present.
+    Separate from is_ai_configured() so the Report Waste page can show a
+    vision-specific status message distinct from the general chatbot one.
+    """
+    return is_ai_configured() and bool(OPENROUTER_VISION_MODEL) and not _is_placeholder(OPENROUTER_VISION_MODEL)
+
+
+def is_watsonx_configured() -> bool:
+    return (
+        bool(WATSONX_API_KEY) and not _is_placeholder(WATSONX_API_KEY)
+        and bool(WATSONX_PROJECT_ID) and not _is_placeholder(WATSONX_PROJECT_ID)
+    )
+
+
+def ai_not_configured_reason() -> str:
+    """
+    A specific, human-readable reason why AI features are unavailable --
+    used instead of a generic "not configured" so users (and you, while
+    debugging) know exactly what to fix. Only relevant once BOTH
+    OpenRouter and watsonx.ai are unconfigured (either one alone is
+    sufficient for vision classification — see is_vision_configured() /
+    is_watsonx_configured() and classify_waste_image()'s fallback logic).
+    """
+    if is_watsonx_configured():
+        return "IBM watsonx.ai is configured."
+    if not OPENROUTER_API_KEY:
+        return "OPENROUTER_API_KEY is not set, and no IBM watsonx.ai credentials are configured either."
+    if _is_placeholder(OPENROUTER_API_KEY):
+        return ("OPENROUTER_API_KEY is still the placeholder value from .env.example, and no IBM "
+                "watsonx.ai credentials are configured either — set at least one to enable AI features.")
+    return "OpenRouter is configured."
 
 
 def is_adzuna_configured() -> bool:
@@ -76,4 +215,3 @@ def is_adzuna_configured() -> bool:
 
 def is_jooble_configured() -> bool:
     return bool(JOOBLE_API_KEY)
-

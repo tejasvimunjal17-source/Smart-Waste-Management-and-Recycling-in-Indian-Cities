@@ -9,3 +9,4 @@ openpyxl>=3.1.5
 fpdf2>=2.7.9
 streamlit-lottie>=0.0.5
 streamlit-option-menu>=0.3.13
+opencv-python-headless>=4.10.0.84  # video frame extraction for Report Waste video classification

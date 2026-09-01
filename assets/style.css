@@ -34,6 +34,14 @@
     box-shadow: 0 12px 40px rgba(16, 185, 129, 0.18);
 }
 
+/* Centered brand — public (logged-out) landing page header only */
+.eco-brand-center {
+    text-align: center;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0.75rem 0 1.25rem 0;
+}
+
 /* Hero */
 .eco-hero {
     text-align: center;

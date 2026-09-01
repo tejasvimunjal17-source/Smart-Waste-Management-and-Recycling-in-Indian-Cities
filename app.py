@@ -26,7 +26,7 @@ init_session_state()
 # behavior below; only the logged-out view is simplified.
 is_public_landing = not st.session_state.get("user")
 
-load_css(landing_mode=is_public_landing)
+load_css(show_sidebar_toggle=not is_public_landing)
 
 # ---------------------------------------------------------------
 # Top nav bar (approximated with columns — Streamlit has no fixed

@@ -5,7 +5,7 @@ from utils.helpers import load_css, init_session_state
 
 st.set_page_config(page_title="Register | EcoVision AI", page_icon="📝", layout="centered")
 init_session_state()
-load_css()
+load_css(show_sidebar_toggle=False)  # standalone auth page — no drawer toggle
 
 st.markdown('<div class="eco-hero"><h1>📝 Create Your Account</h1><p>Join thousands of citizens making Indian cities cleaner and greener.</p></div>', unsafe_allow_html=True)
 

@@ -95,7 +95,7 @@ _GLOW = "rgba(16,185,129,0.30)"
 _GLOW_HOVER = "rgba(16,185,129,0.45)"
 
 
-def render_custom_sidebar_controls() -> None:
+def render_custom_sidebar_controls(landing_mode: bool = False) -> None:
     """Render the 🌎 drawer toggle, the mobile tap-to-close backdrop, and
     apply the resulting open/closed CSS.
 
@@ -104,7 +104,19 @@ def render_custom_sidebar_controls() -> None:
     toggle button and the backdrop are independent, fixed-position
     elements, so they don't need to live inside `st.sidebar` to work, and
     nothing about EcoVision's existing sidebar content is touched.
+
+    landing_mode
+        When True (public, logged-out landing page only — see app.py),
+        the 🌎 toggle/backdrop are not rendered at all and the native
+        sidebar + Streamlit header are hidden outright via scoped CSS.
+        This branch is entirely additive: it does not alter anything
+        below for the default `landing_mode=False` case, which is what
+        every authenticated/internal page continues to use unchanged.
     """
+    if landing_mode:
+        _render_landing_mode_css()
+        return
+
     st.session_state.setdefault("sidebar_open", True)
     is_open = st.session_state["sidebar_open"]
 
@@ -266,6 +278,63 @@ def render_custom_sidebar_controls() -> None:
         .block-container {{
             padding-top: 4.5rem !important;
         }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_landing_mode_css() -> None:
+    """Public-landing-page-only styling: no 🌎 toggle/backdrop is
+    rendered at all (nothing to click, no empty container, no reserved
+    space for it), and the native sidebar + Streamlit header/toolbar are
+    hidden outright.
+
+    Scope: this function is only ever reached from
+    `render_custom_sidebar_controls(landing_mode=True)`, which app.py
+    opts into only while the visitor is logged out (see the
+    `is_public_landing` flag in app.py). Every other page keeps calling
+    `render_custom_sidebar_controls()` with the default
+    `landing_mode=False`, which is 100% unchanged from before — so
+    authenticated/internal pages retain the 🌎 toggle, the sidebar, and
+    all existing navigation exactly as-is.
+    """
+    st.markdown(
+        """
+        <style>
+        /* ---- Public landing page only: no native sidebar, no reserved
+        space for it. Internal/authenticated pages never hit this code
+        path, so their sidebar is untouched. ---- */
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+
+        /* ---- Public landing page only: hide the entire native
+        Streamlit header bar (contains the toolbar/share/deploy cluster
+        and the "⋮" menu). Safe here because the landing page has no
+        dialogs, auth controls, or app widgets that live inside that
+        header — those all render further down in the normal page flow
+        and are untouched. ---- */
+        header[data-testid="stHeader"] {
+            display: none !important;
+        }
+        div[data-testid="stToolbarActions"] {
+            display: none !important;
+        }
+        .stAppDeployButton {
+            display: none !important;
+        }
+
+        /* ---- No 🌎 toggle exists on this page, so remove the top-padding
+        reservation that normally keeps content clear of it — the landing
+        page should start naturally from the top instead of with a large
+        blank gap where the header used to be. ---- */
+        .block-container {
+            padding-top: 2rem !important;
+        }
+        html, body, .stApp, div[data-testid="stAppViewContainer"] {
+            overflow-x: hidden;
+        }
         </style>
         """,
         unsafe_allow_html=True,

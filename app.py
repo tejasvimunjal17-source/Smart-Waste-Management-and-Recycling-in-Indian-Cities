@@ -20,17 +20,25 @@ st.set_page_config(
 
 init_db()
 init_session_state()
-load_css()
+
+# Public landing page = visitor is not logged in yet. Authenticated users
+# viewing this same app.py (Home) keep the exact original header/nav/hero
+# behavior below; only the logged-out view is simplified.
+is_public_landing = not st.session_state.get("user")
+
+load_css(landing_mode=is_public_landing)
 
 # ---------------------------------------------------------------
 # Top nav bar (approximated with columns — Streamlit has no fixed
 # navbar, so we keep it compact and always at the top of the page)
 # ---------------------------------------------------------------
-nav_l, nav_r = st.columns([3, 2])
-with nav_l:
-    st.markdown("### 🌿 EcoVision AI")
-with nav_r:
-    if st.session_state.get("user"):
+if is_public_landing:
+    st.markdown('<div class="eco-brand-center">🌿 EcoVision AI</div>', unsafe_allow_html=True)
+else:
+    nav_l, nav_r = st.columns([3, 2])
+    with nav_l:
+        st.markdown("### 🌿 EcoVision AI")
+    with nav_r:
         u = st.session_state["user"]
         c1, c2 = st.columns(2)
         with c1:
@@ -40,14 +48,8 @@ with nav_r:
                 from utils.helpers import logout
                 logout()
                 st.rerun()
-    else:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.page_link("pages/1_🔐_Login.py", label="Login", icon="🔐")
-        with c2:
-            st.page_link("pages/2_📝_Register.py", label="Register", icon="📝")
 
-st.divider()
+    st.divider()
 
 # ---------------------------------------------------------------
 # HERO
@@ -65,17 +67,23 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-hc1, hc2, hc3, hc4 = st.columns(4)
-with hc1:
-    if st.button("🚀 Get Started", use_container_width=True, type="primary"):
-        st.switch_page("pages/2_📝_Register.py")
-with hc2:
-    st.page_link("pages/12_📈_Dashboard_Generator.py", label="📊 View Dashboard Demo", use_container_width=True)
-with hc3:
-    st.page_link("pages/9_🤖_Prakriti_AI_Connect.py", label="🌿 Talk to Prakriti AI", use_container_width=True)
-with hc4:
-    if st.button("▶ Explore Features", use_container_width=True):
-        st.session_state["_scroll_features"] = True
+if is_public_landing:
+    gs_l, gs_c, gs_r = st.columns([1, 1, 1])
+    with gs_c:
+        if st.button("🚀 Get Started", use_container_width=True, type="primary", key="get_started_landing"):
+            st.switch_page("pages/2_📝_Register.py")
+else:
+    hc1, hc2, hc3, hc4 = st.columns(4)
+    with hc1:
+        if st.button("🚀 Get Started", use_container_width=True, type="primary"):
+            st.switch_page("pages/2_📝_Register.py")
+    with hc2:
+        st.page_link("pages/12_📈_Dashboard_Generator.py", label="📊 View Dashboard Demo", use_container_width=True)
+    with hc3:
+        st.page_link("pages/9_🤖_Prakriti_AI_Connect.py", label="🌿 Talk to Prakriti AI", use_container_width=True)
+    with hc4:
+        if st.button("▶ Explore Features", use_container_width=True):
+            st.session_state["_scroll_features"] = True
 
 st.markdown("---")
 

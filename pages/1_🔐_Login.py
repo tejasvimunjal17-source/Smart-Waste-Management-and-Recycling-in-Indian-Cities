@@ -4,7 +4,7 @@ from utils.helpers import load_css, init_session_state, toast
 
 st.set_page_config(page_title="Login | EcoVision AI", page_icon="🔐", layout="centered")
 init_session_state()
-load_css()
+load_css(show_sidebar_toggle=False)  # standalone auth page — no drawer toggle
 
 st.markdown('<div class="eco-hero"><h1>🔐 Welcome Back</h1><p>Log in to report waste, track complaints, and chat with Prakriti AI.</p></div>', unsafe_allow_html=True)
 

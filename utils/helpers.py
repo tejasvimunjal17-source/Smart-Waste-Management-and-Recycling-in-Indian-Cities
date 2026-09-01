@@ -6,12 +6,17 @@ from datetime import datetime
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 
 
-def load_css(landing_mode: bool = False):
+def load_css(show_sidebar_toggle: bool = True):
     """
-    landing_mode: pass True only from the public (logged-out) landing
-    page in app.py to additionally suppress the 🌎 drawer/sidebar and
-    Streamlit header there. Every other call site keeps the default
-    False, which is the exact, unchanged existing behavior.
+    The native Streamlit header/toolbar is always hidden, on every page,
+    unconditionally — that part is not configurable (see
+    frontend.custom_sidebar._hide_streamlit_header()).
+
+    show_sidebar_toggle: whether THIS page shows the EcoVision 🌎 custom
+    drawer toggle + sidebar. Defaults to True, which is the original,
+    unchanged behavior — every existing page keeps calling load_css()
+    with no arguments and is unaffected. Pass False only from the public
+    landing page and the standalone Login/Register pages.
     """
     css_path = ASSETS_DIR / "style.css"
     if css_path.exists():
@@ -22,7 +27,7 @@ def load_css(landing_mode: bool = False):
     # Streamlit's own native, auto-generated page-nav sidebar via CSS; it
     # does not add, remove, or reorder any pages/routes.
     from frontend.custom_sidebar import render_custom_sidebar_controls
-    render_custom_sidebar_controls(landing_mode=landing_mode)
+    render_custom_sidebar_controls(show_toggle=show_sidebar_toggle)
 
 
 def init_session_state():

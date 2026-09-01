@@ -6,7 +6,13 @@ from datetime import datetime
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 
 
-def load_css():
+def load_css(landing_mode: bool = False):
+    """
+    landing_mode: pass True only from the public (logged-out) landing
+    page in app.py to additionally suppress the 🌎 drawer/sidebar and
+    Streamlit header there. Every other call site keeps the default
+    False, which is the exact, unchanged existing behavior.
+    """
     css_path = ASSETS_DIR / "style.css"
     if css_path.exists():
         st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
@@ -16,7 +22,7 @@ def load_css():
     # Streamlit's own native, auto-generated page-nav sidebar via CSS; it
     # does not add, remove, or reorder any pages/routes.
     from frontend.custom_sidebar import render_custom_sidebar_controls
-    render_custom_sidebar_controls()
+    render_custom_sidebar_controls(landing_mode=landing_mode)
 
 
 def init_session_state():

@@ -52,8 +52,17 @@ behaves.
 
 The only Streamlit-internal selectors touched are:
 
+    header[data-testid="stHeader"]           - Streamlit's native app
+                                                header/toolbar/deploy/
+                                                share bar. Hidden
+                                                UNCONDITIONALLY, on every
+                                                page, independent of the
+                                                sidebar logic below (see
+                                                _hide_streamlit_header()).
     section[data-testid="stSidebar"]         - the sidebar, repositioned
                                                 fixed + slid via transform
+                                                (or hidden outright when
+                                                show_toggle=False)
     section[data-testid="stMain"], .main     - main content, margin-left
                                                 animated on desktop only
     [data-testid="collapsedControl"],
@@ -72,6 +81,20 @@ EcoVision's sidebar content (Streamlit's own auto-generated page nav
 list, built from the files in pages/) is completely untouched - nothing
 is moved, rebuilt, or hand-authored; it's the same native sidebar,
 merely repositioned/animated.
+
+Two independent systems — do not conflate them
+------------------------------------------------
+(A) The native Streamlit header/toolbar (`header[data-testid="stHeader"]`)
+    is purely cosmetic chrome Streamlit itself injects. It has nothing to
+    do with the sidebar and is hidden the same way on every single page,
+    unconditionally, via `_hide_streamlit_header()` below.
+(B) The EcoVision custom 🌎 drawer/sidebar is a separate, app-specific
+    navigation affordance. Its visibility is a per-page decision (hidden
+    on the public landing page and on the standalone Login/Register
+    pages; shown on every authenticated/internal page) controlled by the
+    `show_toggle` argument to `render_custom_sidebar_controls()`.
+Hiding (A) never hides, disables, or otherwise touches (B), and vice
+versa — they share no selectors.
 
 State
 ------
@@ -95,16 +118,68 @@ _GLOW = "rgba(16,185,129,0.30)"
 _GLOW_HOVER = "rgba(16,185,129,0.45)"
 
 
-def render_custom_sidebar_controls() -> None:
-    """Render the 🌎 drawer toggle, the mobile tap-to-close backdrop, and
-    apply the resulting open/closed CSS.
+def _hide_streamlit_header() -> None:
+    """Hide Streamlit's native app header/toolbar/deploy/share bar —
+    UNCONDITIONALLY, on every single page, every time.
+
+    This is called first, on its own, from every code path in
+    `render_custom_sidebar_controls()` below (both show_toggle=True and
+    show_toggle=False), which itself is called from
+    `utils.helpers.load_css()`, which every page in this app calls.
+    There is no page that can skip this — that's the fix for the header
+    re-appearing on internal pages.
+
+    Deliberately scoped to ONLY the header element and its two known
+    sub-parts (toolbar actions, deploy button) — never `.stApp`,
+    `[data-testid="stAppViewContainer"]`, `[data-testid="stMain"]`, or
+    `.block-container`. This selector is completely independent of
+    `section[data-testid="stSidebar"]`, so it can never affect the
+    custom sidebar's visibility.
+    """
+    st.markdown(
+        """
+        <style>
+        header[data-testid="stHeader"] {
+            display: none !important;
+        }
+        div[data-testid="stToolbarActions"] {
+            display: none !important;
+        }
+        .stAppDeployButton {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_custom_sidebar_controls(show_toggle: bool = True) -> None:
+    """Hide the native Streamlit header (always), then render the
+    EcoVision 🌎 drawer toggle + sidebar according to `show_toggle`.
 
     Call this once, early on every page (it's wired into
     utils.helpers.load_css(), which every page already calls) - both the
     toggle button and the backdrop are independent, fixed-position
     elements, so they don't need to live inside `st.sidebar` to work, and
     nothing about EcoVision's existing sidebar content is touched.
+
+    show_toggle
+        True (default) — used by every authenticated/internal page,
+        unchanged from the original behavior: renders the 🌎 toggle, the
+        mobile backdrop, and the sliding-drawer CSS exactly as before.
+        False — used only by the public landing page and the standalone
+        Login/Register pages: renders no toggle/backdrop at all (nothing
+        to click, no empty container) and hides the native sidebar
+        outright, with no reserved top clearance for a toggle that isn't
+        there.
     """
+    _hide_streamlit_header()
+
+    if not show_toggle:
+        _hide_sidebar_no_toggle_css()
+        return
+
     st.session_state.setdefault("sidebar_open", True)
     is_open = st.session_state["sidebar_open"]
 
@@ -237,19 +312,6 @@ def render_custom_sidebar_controls() -> None:
             }}
         }}
 
-        /* ---- Hide the GitHub / Share / star / fork icon cluster in
-        Streamlit's toolbar (top-right). Multiple selectors are targeted
-        since the exact data-testid has varied across Streamlit
-        versions; this is purely cosmetic (display:none) and does not
-        remove any app functionality — the "⋮" settings/rerun menu
-        (#MainMenu) is intentionally left untouched. ---- */
-        div[data-testid="stToolbarActions"] {{
-            display: none !important;
-        }}
-        .stAppDeployButton {{
-            display: none !important;
-        }}
-
         /* ---- Hide Streamlit's own native collapse control - fully
         replaced by our 🌎 button above. Presentational display:none only,
         not a click or a state read. ---- */
@@ -266,6 +328,39 @@ def render_custom_sidebar_controls() -> None:
         .block-container {{
             padding-top: 4.5rem !important;
         }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _hide_sidebar_no_toggle_css() -> None:
+    """Used only when show_toggle=False (public landing page, and the
+    standalone Login/Register pages): no 🌎 toggle/backdrop is rendered
+    at all (nothing to click, no empty container, no reserved space for
+    it), and the native sidebar is hidden outright.
+
+    Scoped to `section[data-testid="stSidebar"]` only — never touches
+    `header[data-testid="stHeader"]` (that's handled unconditionally by
+    `_hide_streamlit_header()`, already called before this) and never
+    touches `.stApp`, `stAppViewContainer`, `stMain`, or
+    `.block-container` beyond the single top-padding rule below.
+    """
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+
+        /* No 🌎 toggle exists on this page, so remove the top-padding
+        reservation that normally keeps content clear of it. */
+        .block-container {
+            padding-top: 2rem !important;
+        }
+        html, body, .stApp, div[data-testid="stAppViewContainer"] {
+            overflow-x: hidden;
+        }
         </style>
         """,
         unsafe_allow_html=True,

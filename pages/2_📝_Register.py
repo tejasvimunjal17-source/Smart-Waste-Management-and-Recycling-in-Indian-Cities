@@ -3,7 +3,7 @@ from backend.auth import register_user, validate_password_strength
 from utils.validators import is_valid_email, is_valid_indian_phone
 from utils.helpers import load_css, init_session_state
 
-st.set_page_config(page_title="Register | EcoVision AI", page_icon="📝", layout="centered")
+st.set_page_config(page_title="Register | EcoVision AI", page_icon="📝", layout="centered", initial_sidebar_state="collapsed")
 init_session_state()
 load_css(show_sidebar_toggle=False)  # standalone auth page — no drawer toggle
 

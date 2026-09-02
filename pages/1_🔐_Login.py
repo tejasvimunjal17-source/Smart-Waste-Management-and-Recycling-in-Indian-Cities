@@ -2,7 +2,7 @@ import streamlit as st
 from backend.auth import login_user, get_security_question, reset_password
 from utils.helpers import load_css, init_session_state, toast
 
-st.set_page_config(page_title="Login | EcoVision AI", page_icon="🔐", layout="centered")
+st.set_page_config(page_title="Login | EcoVision AI", page_icon="🔐", layout="centered", initial_sidebar_state="collapsed")
 init_session_state()
 load_css(show_sidebar_toggle=False)  # standalone auth page — no drawer toggle
 

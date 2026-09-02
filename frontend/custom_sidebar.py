@@ -130,12 +130,22 @@ def _hide_streamlit_header() -> None:
     There is no page that can skip this — that's the fix for the header
     re-appearing on internal pages.
 
-    Deliberately scoped to ONLY the header element and its two known
-    sub-parts (toolbar actions, deploy button) — never `.stApp`,
-    `[data-testid="stAppViewContainer"]`, `[data-testid="stMain"]`, or
-    `.block-container`. This selector is completely independent of
-    `section[data-testid="stSidebar"]`, so it can never affect the
-    custom sidebar's visibility.
+    Deliberately scoped to ONLY the header element and its known
+    sub-parts (toolbar, toolbar actions, deploy button, legacy main-menu
+    id) — never `.stApp`, `[data-testid="stAppViewContainer"]`,
+    `[data-testid="stMain"]`, or `.block-container`. This selector is
+    completely independent of `section[data-testid="stSidebar"]`, so it
+    can never affect the custom sidebar's visibility.
+
+    This CSS is defense-in-depth on top of `.streamlit/config.toml`'s
+    `[client] toolbarMode = "viewer"`, which is the primary, native-level
+    fix (see the comment there for why "viewer" and not "minimal"/
+    "auto") and has no script-execution race. This block stays as a
+    fallback for anything that config doesn't cover on a given Streamlit
+    build, using multiple selectors because the exact test-id has moved
+    across Streamlit versions — `stToolbar` is the current one; older
+    `stToolbarActions`/`stAppDeployButton`/`#MainMenu` are kept too so
+    nothing regresses if the deployed version changes again.
     """
     st.markdown(
         """
@@ -143,10 +153,16 @@ def _hide_streamlit_header() -> None:
         header[data-testid="stHeader"] {
             display: none !important;
         }
+        div[data-testid="stToolbar"] {
+            display: none !important;
+        }
         div[data-testid="stToolbarActions"] {
             display: none !important;
         }
         .stAppDeployButton {
+            display: none !important;
+        }
+        #MainMenu {
             display: none !important;
         }
         </style>

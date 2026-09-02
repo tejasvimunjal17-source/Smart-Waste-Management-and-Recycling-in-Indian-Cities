@@ -45,10 +45,11 @@ model this particular Streamlit version uses.
 Because the sidebar is no longer part of the flex/grid flow, main
 content no longer reflows into its space automatically - so on desktop
 this file also sets an explicit `margin-left` on the main content
-container, toggled in sync with the same transition. On mobile, the
-drawer instead overlays on top of the content (no margin shift), with a
-tap-to-close backdrop - matching how the Gmail/Drive Android drawer
-behaves.
+container, snapped instantly (not transitioned — see the inline comment
+above that rule for why) in sync with the sidebar's own transform-based
+slide. On mobile, the drawer instead overlays on top of the content (no
+margin shift), with a tap-to-close backdrop - matching how the
+Gmail/Drive Android drawer behaves.
 
 The only Streamlit-internal selectors touched are:
 
@@ -244,6 +245,7 @@ def render_custom_sidebar_controls(show_toggle: bool = True) -> None:
             max-width: {_DRAWER_WIDTH} !important;
             z-index: 999998;
             overflow-y: auto !important;
+            will-change: transform;
             transform: {transform};
             transition: transform {_TRANSITION_MS}ms ease;
         }}
@@ -256,29 +258,40 @@ def render_custom_sidebar_controls(show_toggle: bool = True) -> None:
         }}
 
         /* ---- Desktop only: main content margin AND width both shift in
-        sync with the drawer. THIS IS THE FIX for the horizontal
-        layout-shift/right-edge-clipping bug: the previous version only
-        set margin-left here, with no matching width change. Since the
-        sidebar is position:fixed (out of flex flow — see module
-        docstring), stMain is the sole remaining flex child of its
-        parent and therefore already stretches to 100% of the viewport
-        width on its own; adding margin-left on top of an already
-        full-width box pushes its right edge that same distance PAST the
-        viewport's right edge, which is exactly the overflow/clipping
-        seen in the reported screenshots. Explicitly shrinking width by
-        the same amount the content is shifted keeps the right edge
-        anchored at the viewport edge instead of sliding off it, so
-        content actually resizes to fill the remaining space rather than
-        merely being shifted while staying full-width. On mobile the
-        drawer overlays instead (no margin/width shift — see the
-        backdrop below). ---- */
+        sync with the drawer, INSTANTLY (no transition on this block).
+        THIS IS THE FIX for the horizontal layout-shift/right-edge-
+        clipping bug: the previous version only set margin-left here,
+        with no matching width change. Since the sidebar is
+        position:fixed (out of flex flow — see module docstring),
+        stMain is the sole remaining flex child of its parent and
+        therefore already stretches to 100% of the viewport width on
+        its own; adding margin-left on top of an already full-width box
+        pushes its right edge that same distance PAST the viewport's
+        right edge, which is exactly the overflow/clipping seen in the
+        reported screenshots. Explicitly shrinking width by the same
+        amount the content is shifted keeps the right edge anchored at
+        the viewport edge instead of sliding off it, so content
+        actually resizes to fill the remaining space rather than merely
+        being shifted while staying full-width.
+
+        Deliberately UNANIMATED: animating `width` forces the browser to
+        recompute layout on every frame of the transition (unlike the
+        sidebar's own transform-only slide above, which is handled
+        entirely by compositing and never touches layout) — on a
+        mid-range mobile GPU that's the difference between an instant
+        snap and a visibly janky reflow. The sidebar's slide already
+        reads as the animation; the content resizing instantly alongside
+        it reads as a single clean state change rather than two
+        competing motions, and removes the actual expensive-repaint cost
+        flagged in the mobile recording. On mobile the drawer overlays
+        instead (no margin/width shift at all — see the backdrop
+        below). ---- */
         @media (min-width: 641px) {{
             section[data-testid="stMain"], .main {{
                 margin-left: {main_margin} !important;
                 width: calc(100% - {main_margin}) !important;
                 max-width: calc(100% - {main_margin}) !important;
                 box-sizing: border-box !important;
-                transition: margin-left {_TRANSITION_MS}ms ease, width {_TRANSITION_MS}ms ease;
             }}
         }}
 

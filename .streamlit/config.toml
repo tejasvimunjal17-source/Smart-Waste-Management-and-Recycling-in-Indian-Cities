@@ -8,3 +8,16 @@ font = "sans serif"
 
 [server]
 maxUploadSize = 10
+
+[client]
+# Native-level (not CSS) suppression of Streamlit's own Share/Deploy/
+# GitHub/"⋮" menu chrome. Applied by the Streamlit frontend at initial
+# page mount, before any per-page Python script runs — so unlike the
+# st.markdown()-injected CSS in frontend/custom_sidebar.py (kept as a
+# defense-in-depth fallback for older/edge-case Streamlit builds), this
+# has no script-execution race: the header never has a chance to flash
+# visible during navigation. Only affects that top toolbar — completely
+# independent of, and does not touch, the EcoVision custom sidebar
+# (section[data-testid="stSidebar"]), which is controlled per-page in
+# frontend/custom_sidebar.py as before.
+toolbarMode = "minimal"

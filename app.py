@@ -7,24 +7,40 @@ redirect hint (logged in). Streamlit auto-builds sidebar navigation
 from the numbered files inside pages/.
 """
 import streamlit as st
-from database.db import init_db
 from utils.helpers import load_css, init_session_state
 from config import settings
+
+# init_session_state() (below) already calls init_db() itself, guarded by
+# a st.session_state["_db_initialized"] flag so it only actually runs
+# once per browser session (see utils/helpers.py). This file used to ALSO
+# import and call the raw, unconditional init_db() directly beforehand —
+# meaning on every single rerun of the Home page (any button click,
+# widget interaction, etc. on app.py), the full schema script plus all
+# three seed functions re-ran against SQLite from scratch, including a
+# fresh sqlite3.connect() per query. That redundant work (not the
+# guarded call below — this file's own duplicate direct call) was pure,
+# unnecessary duplication and a real, measurable source of the reported
+# lag on the landing/Home page. Removing it here does not skip DB
+# initialization — init_session_state() still guarantees it runs
+# (exactly once per session) for every page, app.py included.
+#
+# init_session_state() itself does no Streamlit rendering — only DB
+# setup and plain st.session_state dict defaults — so calling it before
+# st.set_page_config() is safe and lets us pick the correct
+# initial_sidebar_state up front. This matters for perceived performance:
+# initial_sidebar_state is a native Streamlit config applied at first
+# paint, before any script-injected CSS reaches the browser, so starting
+# logged-out visitors "collapsed" avoids the large native sidebar
+# flashing open before our CSS hides it.
+init_session_state()
+is_public_landing = not st.session_state.get("user")
 
 st.set_page_config(
     page_title="EcoVision AI | Smart Waste Management",
     page_icon="🌿",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed" if is_public_landing else "expanded",
 )
-
-init_db()
-init_session_state()
-
-# Public landing page = visitor is not logged in yet. Authenticated users
-# viewing this same app.py (Home) keep the exact original header/nav/hero
-# behavior below; only the logged-out view is simplified.
-is_public_landing = not st.session_state.get("user")
 
 load_css(show_sidebar_toggle=not is_public_landing)
 

@@ -10,18 +10,11 @@ font = "sans serif"
 maxUploadSize = 10
 
 [client]
-# Sent to the browser as part of the initial session handshake, BEFORE any
-# page script runs or any CSS from load_css()/custom_sidebar.py can reach
-# the client. This is what actually stops the native Share/Deploy/GitHub/
-# menu toolbar from flashing visible during navigation/reruns â€” the CSS
-# rule in frontend/custom_sidebar.py (_hide_streamlit_header) is kept as a
-# defensive second layer, but this config is the real, root-cause fix.
-# "minimal" hides the toolbar entirely unless something (e.g. Streamlit
-# Community Cloud chrome) sets its own toolbar items externally.
+# Framework-level suppression of the native deploy/toolbar chrome, so it
+# never has to be raced-against by our own injected CSS
+# (_hide_streamlit_header() in frontend/custom_sidebar.py) — this is what
+# actually eliminates the header flash, since it applies before any
+# st.markdown-injected <style> can. The CSS hiding stays in place as a
+# defense-in-depth belt-and-braces layer for header sub-elements this
+# setting doesn't cover.
 toolbarMode = "minimal"
-# Explicitly left true (Streamlit's default): every authenticated page
-# still needs Streamlit's own auto-generated pages/ nav list, since
-# frontend/custom_sidebar.py repositions that same native sidebar as the
-# ðŸŒŽ drawer rather than building a hand-rolled nav. Only per-page CSS (via
-# show_toggle=False) hides it on the public landing/Login/Register pages.
-showSidebarNavigation = true

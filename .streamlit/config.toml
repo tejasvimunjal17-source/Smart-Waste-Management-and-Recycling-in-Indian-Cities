@@ -10,34 +10,18 @@ font = "sans serif"
 maxUploadSize = 10
 
 [client]
-# Native-level (not CSS) suppression of Streamlit's own Share/Deploy/
-# GitHub/"⋮" menu chrome. Applied by the Streamlit frontend at initial
-# page mount, before any per-page Python script runs — so unlike the
-# st.markdown()-injected CSS in frontend/custom_sidebar.py (kept as a
-# defense-in-depth fallback), this has no script-execution race: the
-# header never has a chance to flash visible during navigation. Only
-# affects that top toolbar — completely independent of, and does not
-# touch, the EcoVision custom sidebar (section[data-testid="stSidebar"]),
-# which is controlled per-page in frontend/custom_sidebar.py as before.
-#
-# Deliberately "viewer", NOT "minimal":
-#   - "auto" (Streamlit's default) and "minimal" both still show the full
-#     developer toolbar (Share, star, the GitHub-edit pencil, GitHub link,
-#     Deploy, "⋮" menu) to whoever Streamlit Cloud recognizes as the
-#     app's owner/developer — i.e. exactly what showed up in testing
-#     while logged into the Streamlit Cloud account that owns this app.
-#     That is Streamlit's documented, intentional behavior for "auto",
-#     not a bug — "minimal" is *supposed* to additionally strip it down
-#     to only externally-set menu items, but Streamlit has an open,
-#     team-confirmed regression (github.com/streamlit/streamlit/issues/12083)
-#     since v1.47 where "minimal" still leaks extra toolbar items. Given
-#     this app is deployed on Streamlit 1.63.0 (confirmed from the
-#     Streamlit Cloud build log — well past v1.47), relying on "minimal"
-#     is exactly the mechanism that was silently failing.
-#   - "viewer" has no such caveat: its sole documented behavior is
-#     "Hide the developer options," full stop — including for the
-#     recognized owner. That matches the actual requirement (no
-#     Streamlit toolbar/menu chrome visible to anyone, ever, including
-#     during our own testing) exactly, with no version-dependent bug in
-#     the way.
-toolbarMode = "viewer"
+# Sent to the browser as part of the initial session handshake, BEFORE any
+# page script runs or any CSS from load_css()/custom_sidebar.py can reach
+# the client. This is what actually stops the native Share/Deploy/GitHub/
+# menu toolbar from flashing visible during navigation/reruns â€” the CSS
+# rule in frontend/custom_sidebar.py (_hide_streamlit_header) is kept as a
+# defensive second layer, but this config is the real, root-cause fix.
+# "minimal" hides the toolbar entirely unless something (e.g. Streamlit
+# Community Cloud chrome) sets its own toolbar items externally.
+toolbarMode = "minimal"
+# Explicitly left true (Streamlit's default): every authenticated page
+# still needs Streamlit's own auto-generated pages/ nav list, since
+# frontend/custom_sidebar.py repositions that same native sidebar as the
+# ðŸŒŽ drawer rather than building a hand-rolled nav. Only per-page CSS (via
+# show_toggle=False) hides it on the public landing/Login/Register pages.
+showSidebarNavigation = true

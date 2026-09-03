@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from contextlib import contextmanager
 
+import streamlit as st
+
 from config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -24,12 +26,28 @@ def _row_factory(cursor, row):
     return {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
 
 
-@contextmanager
-def get_connection():
+@st.cache_resource(show_spinner=False)
+def _get_shared_connection():
+    """
+    One SQLite connection per app process, reused across every query and
+    every rerun. Previously get_connection() called sqlite3.connect() fresh
+    on every single fetch_one/fetch_all/execute — since Streamlit reruns the
+    whole script on every interaction, and most pages issue several queries
+    per rerun, that meant multiple brand-new DB connections (each paying
+    filesystem/handshake overhead) on every click. Caching it here with
+    st.cache_resource fixes that directly. check_same_thread=False keeps
+    this safe across Streamlit's threaded script runs, same as before.
+    """
     Path(settings.DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(settings.DATABASE_PATH, timeout=10, check_same_thread=False)
     conn.row_factory = _row_factory
     conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+@contextmanager
+def get_connection():
+    conn = _get_shared_connection()
     try:
         yield conn
         conn.commit()
@@ -37,8 +55,6 @@ def get_connection():
         conn.rollback()
         logger.exception("Database error — transaction rolled back")
         raise
-    finally:
-        conn.close()
 
 
 def init_db():

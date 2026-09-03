@@ -59,8 +59,24 @@ def init_session_state():
 
 
 def require_login(allowed_roles=None):
-    """Call at the top of a protected page. Stops rendering if unauthorized."""
+    """Call at the top of a protected page. Stops rendering if unauthorized.
+
+    Every protected page calls this BEFORE load_css() (so an unauthorized
+    visitor never sees more of the page than the warning below). But
+    load_css() is also what hides Streamlit's native header/toolbar and the
+    full native page-list sidebar — and require_login() can st.stop() before
+    load_css() ever runs. That left a real gap: a logged-out or wrong-role
+    visitor hitting a protected page directly briefly saw Streamlit's raw
+    native chrome, including the full auto-generated sidebar listing every
+    page (Admin/Officer dashboards included), before anything was hidden.
+    Hiding it here too — first thing, before any st.stop() — closes that
+    gap. It's the same CSS load_css() applies later, so it's harmless/
+    idempotent for the success path.
+    """
     init_session_state()
+    from frontend.custom_sidebar import _hide_streamlit_header, _hide_sidebar_no_toggle_css
+    _hide_streamlit_header()
+    _hide_sidebar_no_toggle_css()
     if not st.session_state.get("user"):
         st.warning("🔒 Please log in to access this page.")
         st.page_link("pages/1_🔐_Login.py", label="Go to Login", icon="🔐")

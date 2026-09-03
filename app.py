@@ -7,27 +7,31 @@ redirect hint (logged in). Streamlit auto-builds sidebar navigation
 from the numbered files inside pages/.
 """
 import streamlit as st
+from database.db import init_db
 from utils.helpers import load_css, init_session_state
 from config import settings
 
-# session_state already carries over from the previous rerun (if any), so
-# we can read it BEFORE set_page_config() and pass Streamlit's own
-# initial_sidebar_state accordingly. This matters: initial_sidebar_state is
-# applied by Streamlit natively as part of the page's own initial render,
-# not via a CSS block injected mid-script — so for the common case (a
-# logged-out visitor hitting Home) it prevents the native sidebar from ever
-# flashing "expanded" before load_css()'s CSS arrives. It is a defensive
-# second layer, not a replacement for that CSS (which still runs below).
-is_public_landing = not st.session_state.get("user")
+# Decided BEFORE set_page_config (session_state itself is safe to read pre-
+# config; only calling other st.* commands first is disallowed) so the
+# sidebar's initial state is correct from the very first frame Streamlit
+# paints — not just once our CSS catches up a moment later. Previously this
+# was hardcoded to "expanded" unconditionally, meaning every first-time/
+# logged-out visitor (the Home -> Register flow) got Streamlit's native
+# sidebar force-opened by the framework itself before load_css() ever had a
+# chance to hide it. On a slow connection or cold start that's a real,
+# visible flash of the full native page list — this is what fixes it at
+# the source instead of racing it with CSS.
+_visitor_is_logged_in = bool(st.session_state.get("user"))
 
 st.set_page_config(
     page_title="EcoVision AI | Smart Waste Management",
     page_icon="🌿",
     layout="wide",
-    initial_sidebar_state="collapsed" if is_public_landing else "expanded",
+    initial_sidebar_state="expanded" if _visitor_is_logged_in else "collapsed",
 )
 
-init_session_state()  # guarded internally so init_db() only runs once per session
+init_db()
+init_session_state()
 
 # Public landing page = visitor is not logged in yet. Authenticated users
 # viewing this same app.py (Home) keep the exact original header/nav/hero
